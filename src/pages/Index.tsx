@@ -5,25 +5,59 @@ import ImageUploader from '@/components/ImageUploader';
 import DiseaseResults from '@/components/DiseaseResults';
 import ChatSystem from '@/components/ChatSystem';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
-import { DiseaseResult, getRandomDisease } from '@/lib/mockData';
+import { DiseaseResult } from '@/lib/mockData';
+import { useToast } from '@/hooks/use-toast';
 import heroBg from '@/assets/hero-bg.jpg';
 
+const ANALYZE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-crop`;
+
 const MainContent: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { toast } = useToast();
   const [result, setResult] = useState<DiseaseResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback(async (imageBase64: string) => {
     setIsAnalyzing(true);
     setResult(null);
 
-    // Simulate AI analysis
-    await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 1000));
+    try {
+      const response = await fetch(ANALYZE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          imageBase64,
+          language 
+        }),
+      });
 
-    const disease = getRandomDisease();
-    setResult(disease);
-    setIsAnalyzing(false);
-  }, []);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const data = await response.json();
+      setResult(data);
+
+      toast({
+        title: data.isHealthy ? '✅ Healthy Crop Detected' : '⚠️ Disease Detected',
+        description: `${data.name} - ${data.confidence}% confidence`,
+      });
+
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: 'Analysis Failed',
+        description: error instanceof Error ? error.message : 'Please try again with a clearer image',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [language, toast]);
 
   return (
     <div className="min-h-screen bg-background">

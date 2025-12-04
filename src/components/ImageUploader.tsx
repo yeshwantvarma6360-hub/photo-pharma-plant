@@ -5,7 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
 interface ImageUploaderProps {
-  onImageUpload: (file: File) => void;
+  onImageUpload: (imageBase64: string) => void;
   isAnalyzing: boolean;
 }
 
@@ -18,10 +18,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setPreview(e.target?.result as string);
+        const base64 = e.target?.result as string;
+        setPreview(base64);
+        onImageUpload(base64);
       };
       reader.readAsDataURL(file);
-      onImageUpload(file);
     }
   }, [onImageUpload]);
 
