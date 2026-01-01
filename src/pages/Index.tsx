@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { Leaf, Sparkles, MessageCircle, X } from 'lucide-react';
+import { Leaf, Sparkles, MessageCircle, AlertCircle, ImageOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import LanguageSelector from '@/components/LanguageSelector';
 import ImageUploader from '@/components/ImageUploader';
 import DiseaseResults from '@/components/DiseaseResults';
@@ -19,10 +20,12 @@ const MainContent: React.FC = () => {
   const [result, setResult] = useState<DiseaseResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [notPlantError, setNotPlantError] = useState<string | null>(null);
 
   const handleImageUpload = useCallback(async (imageBase64: string) => {
     setIsAnalyzing(true);
     setResult(null);
+    setNotPlantError(null);
 
     try {
       const response = await fetch(ANALYZE_URL, {
@@ -43,6 +46,18 @@ const MainContent: React.FC = () => {
       }
 
       const data = await response.json();
+      
+      // Check if the image is not a plant
+      if (data.isPlant === false) {
+        setNotPlantError(data.notPlantMessage || 'This image does not appear to contain a plant. Please upload a clear photo of a plant, leaf, or crop for disease analysis.');
+        toast({
+          title: '🌱 Not a Plant Image',
+          description: 'Please upload a photo of a plant or crop',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setResult(data);
 
       toast({
@@ -63,20 +78,26 @@ const MainContent: React.FC = () => {
   }, [language, toast]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-float" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/3 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+      </div>
+
       {/* Hero Section */}
       <header className="relative overflow-hidden">
         <div 
-          className="absolute inset-0 bg-cover bg-center opacity-20"
+          className="absolute inset-0 bg-cover bg-center opacity-15"
           style={{ backgroundImage: `url(${heroBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/80 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
         
         <div className="relative container mx-auto px-4 py-6">
           <nav className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                <Leaf className="w-7 h-7 text-primary" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
+                <Leaf className="w-7 h-7 text-white" />
               </div>
               <span className="text-2xl font-bold gradient-text">{t('title')}</span>
             </div>
@@ -89,7 +110,7 @@ const MainContent: React.FC = () => {
           </div>
 
           <div className="text-center max-w-3xl mx-auto py-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6 animate-slide-up">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6 animate-slide-up border border-primary/20 shadow-sm">
               <Sparkles className="w-4 h-4" />
               AI-Powered Disease Detection
             </div>
@@ -105,22 +126,40 @@ const MainContent: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="relative container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Left Column - Upload & Results */}
           <div className="space-y-6">
             <ImageUploader onImageUpload={handleImageUpload} isAnalyzing={isAnalyzing} />
+            
+            {/* Not a Plant Error Alert */}
+            {notPlantError && (
+              <Alert variant="destructive" className="animate-slide-up">
+                <ImageOff className="h-5 w-5" />
+                <AlertTitle className="flex items-center gap-2">
+                  Not a Plant Image
+                </AlertTitle>
+                <AlertDescription className="mt-2">
+                  {notPlantError}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <DiseaseResults result={result} />
           </div>
 
           {/* Right Column - Chat */}
           <div className="lg:sticky lg:top-8 h-fit">
             {isChatOpen ? (
-              <ChatSystem isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+              <ChatSystem 
+                isOpen={isChatOpen} 
+                onClose={() => setIsChatOpen(false)} 
+                analysisResult={result}
+              />
             ) : (
               <Button
                 onClick={() => setIsChatOpen(true)}
-                className="w-full h-16 text-lg"
+                className="w-full h-16 text-lg shadow-lg"
                 variant="hero"
               >
                 <MessageCircle className="w-5 h-5 mr-2" />
@@ -135,20 +174,21 @@ const MainContent: React.FC = () => {
       {!isChatOpen && (
         <Button
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg lg:hidden z-50"
-          variant="hero"
+          className="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-xl lg:hidden z-50 bg-gradient-to-br from-primary to-primary/80"
           size="icon"
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-7 h-7" />
         </Button>
       )}
 
       {/* Footer */}
-      <footer className="border-t border-border/50 mt-16">
+      <footer className="relative border-t border-border/50 mt-16 bg-gradient-to-t from-muted/50 to-transparent">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Leaf className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Leaf className="w-4 h-4 text-primary" />
+              </div>
               <span className="font-semibold text-foreground">CropGuard AI</span>
             </div>
             <p className="text-sm text-muted-foreground">

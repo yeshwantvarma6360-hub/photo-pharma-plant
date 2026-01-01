@@ -26,6 +26,7 @@ IMPORTANT GUIDELINES:
 6. If discussing pesticides or chemicals, mention waiting periods before harvest
 7. Consider the farmer's local conditions and resources
 8. If you don't know something specific, be honest and suggest consulting a local agricultural extension office
+9. If the user has analyzed a crop image, use that context to provide more relevant advice
 
 Be helpful, practical, and speak in simple language that farmers can easily understand.`;
 
@@ -35,7 +36,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, language } = await req.json();
+    const { messages, language, context } = await req.json();
     
     if (!messages || !Array.isArray(messages)) {
       throw new Error('Messages array is required');
@@ -46,11 +47,18 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    let fullSystemPrompt = systemPrompt;
+    
+    // Add analysis context if available
+    if (context) {
+      fullSystemPrompt += `\n\nCROP ANALYSIS CONTEXT:\n${context}\n\nUse this context to provide personalized advice related to the analyzed crop.`;
+    }
+
     const languageInstruction = language && language !== 'English' 
       ? `\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST respond ENTIRELY in ${language} language. The farmer speaks ${language} and needs to understand your advice in their native language. Use simple, clear ${language} that rural farmers can understand easily.`
       : '';
 
-    console.log('Processing chat message with Lovable AI, language:', language);
+    console.log('Processing chat message with Lovable AI, language:', language, 'has context:', !!context);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -61,7 +69,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: systemPrompt + languageInstruction },
+          { role: 'system', content: fullSystemPrompt + languageInstruction },
           ...messages.map((msg: { role: string; content: string }) => ({
             role: msg.role,
             content: msg.content
@@ -90,7 +98,6 @@ serve(async (req) => {
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
-    // Return the stream directly for real-time responses
     return new Response(response.body, {
       headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
     });
