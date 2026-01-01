@@ -6,51 +6,42 @@ const corsHeaders = {
 };
 
 const systemPrompt = `You are an expert agricultural AI assistant specialized in crop disease detection and plant pathology. 
-When analyzing crop images, you must:
-1. Identify the disease or confirm if the plant is healthy
-2. Provide a confidence score (0-100)
-3. Give a detailed description of the condition
-4. List 5 specific precautions the farmer should take
-5. Recommend 3 general fertilizers/treatments with dosage and timing
-6. Provide 2-3 ORGANIC treatments (natural, eco-friendly solutions)
-7. Provide 2-3 CHEMICAL treatments (with proper safety warnings)
 
-Respond ONLY in valid JSON format with this exact structure:
+CRITICAL FIRST STEP: Before any analysis, you MUST determine if the image contains a plant, crop, leaf, or any agricultural subject.
+
+If the image does NOT contain a plant, crop, leaf, vegetation, or agricultural content:
+- Return this EXACT JSON structure:
 {
+  "isPlant": false,
+  "notPlantMessage": "This image does not appear to contain a plant or crop. Please upload a clear photo of a plant, leaf, or crop for disease analysis."
+}
+
+If the image DOES contain a plant/crop, analyze it and return:
+{
+  "isPlant": true,
   "name": "Disease Name or Healthy Plant",
   "confidence": 85,
   "isHealthy": false,
   "description": "Detailed description of the condition observed",
   "precautions": ["precaution 1", "precaution 2", "precaution 3", "precaution 4", "precaution 5"],
   "fertilizers": [
-    {"name": "Fertilizer Name", "dosage": "amount per application", "timing": "when to apply"},
-    {"name": "Fertilizer Name 2", "dosage": "amount", "timing": "timing"},
-    {"name": "Fertilizer Name 3", "dosage": "amount", "timing": "timing"}
+    {"name": "Fertilizer Name", "dosage": "amount per application", "timing": "when to apply"}
   ],
   "organicTreatments": [
-    {"name": "Organic Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "optional safety tip"},
-    {"name": "Organic Treatment 2", "dosage": "amount", "timing": "timing"}
+    {"name": "Organic Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "optional safety tip"}
   ],
   "chemicalTreatments": [
-    {"name": "Chemical Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "IMPORTANT safety warning"},
-    {"name": "Chemical Treatment 2", "dosage": "amount", "timing": "timing", "safetyNote": "safety warning"}
+    {"name": "Chemical Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "IMPORTANT safety warning"}
   ]
 }
 
-Be specific about the disease symptoms you observe. Common crop diseases include:
+Be specific about disease symptoms. Common crop diseases include:
 - Late Blight, Early Blight, Powdery Mildew, Bacterial Leaf Spot
 - Rust, Anthracnose, Fusarium Wilt, Downy Mildew
 - Leaf Curl, Mosaic Virus, Root Rot, Nutrient Deficiencies
 
-For organic treatments, include natural remedies like:
-- Neem oil, baking soda solutions, compost tea, garlic spray
-- Beneficial insects, crop rotation, companion planting
-- Organic copper or sulfur-based fungicides
-
-For chemical treatments, always include:
-- Proper dosage and application method
-- Safety precautions (PPE, waiting periods before harvest)
-- Environmental considerations`;
+For organic treatments include: Neem oil, baking soda solutions, compost tea, garlic spray, beneficial insects.
+For chemical treatments always include safety precautions (PPE, waiting periods before harvest).`;
 
 const languageInstructions: Record<string, string> = {
   en: '',
@@ -83,7 +74,7 @@ serve(async (req) => {
 
     const langName = languageInstructions[language] || '';
     const languageInstruction = langName 
-      ? `\n\nCRITICAL: You MUST respond with ALL text content (name, description, precautions, all treatment names/dosage/timing/safetyNotes) in ${langName} language. The farmer speaks ${langName} and needs to understand everything clearly in their native language.`
+      ? `\n\nCRITICAL: You MUST respond with ALL text content in ${langName} language, including the notPlantMessage if the image is not a plant.`
       : '';
 
     console.log('Analyzing crop image with Lovable AI, language:', language);
@@ -103,7 +94,7 @@ serve(async (req) => {
             content: [
               { 
                 type: 'text', 
-                text: 'Analyze this crop image carefully. Identify any diseases, nutrient deficiencies, or pest damage. Provide comprehensive treatment options including both organic and chemical solutions. Be accurate and helpful to farmers.' 
+                text: 'First, verify if this image contains a plant, crop, leaf, or any vegetation. If not, indicate that clearly. If it is a plant, analyze it for diseases and provide comprehensive treatment options.' 
               },
               { 
                 type: 'image_url', 
@@ -141,10 +132,8 @@ serve(async (req) => {
     
     console.log('AI Response received:', content?.substring(0, 300));
 
-    // Parse the JSON response
     let result;
     try {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
@@ -153,31 +142,16 @@ serve(async (req) => {
       }
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
-      // Return a fallback response
       result = {
+        isPlant: true,
         name: 'Analysis Complete',
         confidence: 75,
         isHealthy: true,
-        description: content || 'Unable to fully analyze the image. Please try with a clearer photo of the crop.',
-        precautions: [
-          'Ensure good air circulation around plants',
-          'Water at the base to avoid wet foliage',
-          'Monitor regularly for any changes',
-          'Remove any damaged or dead plant material',
-          'Maintain proper soil nutrition'
-        ],
-        fertilizers: [
-          { name: 'Balanced NPK (15-15-15)', dosage: '100g per plant', timing: 'Every 4 weeks' },
-          { name: 'Organic Compost', dosage: '2kg per square meter', timing: 'At planting' },
-          { name: 'Micronutrient Mix', dosage: '2g per liter', timing: 'Monthly foliar spray' }
-        ],
-        organicTreatments: [
-          { name: 'Neem Oil Spray', dosage: '2ml per liter water', timing: 'Every 7 days', safetyNote: 'Apply in evening' },
-          { name: 'Compost Tea', dosage: 'Dilute 1:10', timing: 'Weekly' }
-        ],
-        chemicalTreatments: [
-          { name: 'General Fungicide', dosage: 'As per label', timing: 'When symptoms appear', safetyNote: 'Wear protective gear' }
-        ]
+        description: content || 'Unable to fully analyze the image. Please try with a clearer photo.',
+        precautions: ['Monitor regularly', 'Maintain proper watering', 'Ensure good soil health'],
+        fertilizers: [{ name: 'Balanced NPK', dosage: '100g per plant', timing: 'Monthly' }],
+        organicTreatments: [{ name: 'Neem Oil', dosage: '2ml per liter', timing: 'Weekly' }],
+        chemicalTreatments: [{ name: 'General Fungicide', dosage: 'As per label', timing: 'When needed', safetyNote: 'Wear protective gear' }]
       };
     }
 

@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Upload, Image as ImageIcon, X, Loader2, Camera, Video } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Upload, Image as ImageIcon, X, Loader2, Camera, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -56,21 +58,33 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
     setPreview(null);
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = async (facing: 'environment' | 'user' = facingMode) => {
     try {
+      // Stop existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      setIsCameraReady(false);
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: facing,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         } 
       });
       streamRef.current = stream;
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setIsCameraReady(true);
+        };
       }
       setShowCamera(true);
+      setFacingMode(facing);
     } catch (error) {
       console.error('Camera error:', error);
       toast({
@@ -81,21 +95,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
     }
   };
 
+  const toggleCamera = () => {
+    const newFacing = facingMode === 'environment' ? 'user' : 'environment';
+    startCamera(newFacing);
+  };
+
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     setShowCamera(false);
+    setIsCameraReady(false);
   };
 
   const capturePhoto = () => {
-    if (videoRef.current) {
+    if (videoRef.current && isCameraReady) {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Mirror the image if using front camera
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(videoRef.current, 0, 0);
         const base64 = canvas.toDataURL('image/jpeg', 0.9);
         setPreview(base64);
@@ -105,33 +130,77 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
     }
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   return (
     <div className="w-full">
       {showCamera ? (
         <div className="relative border-2 border-primary rounded-2xl overflow-hidden bg-black">
           <video 
             ref={videoRef} 
-            className="w-full max-h-[300px] object-cover"
+            className={cn(
+              "w-full max-h-[350px] object-cover",
+              facingMode === 'user' && "scale-x-[-1]"
+            )}
             autoPlay
             playsInline
             muted
           />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+          
+          {/* Camera controls overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+          
+          {/* Camera loading indicator */}
+          {!isCameraReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <Loader2 className="w-10 h-10 text-white animate-spin" />
+            </div>
+          )}
+          
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
+            {/* Switch Camera */}
+            <Button 
+              onClick={toggleCamera}
+              size="lg"
+              variant="outline"
+              className="rounded-full w-12 h-12 p-0 bg-white/20 backdrop-blur border-white/30 text-white hover:bg-white/30"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </Button>
+            
+            {/* Capture Button - Only enabled when camera is ready */}
             <Button 
               onClick={capturePhoto}
               size="lg"
-              className="rounded-full w-16 h-16 p-0 bg-white hover:bg-gray-100"
+              disabled={!isCameraReady}
+              className="rounded-full w-20 h-20 p-0 bg-white hover:bg-gray-100 border-4 border-primary shadow-lg disabled:opacity-50"
             >
-              <Camera className="w-8 h-8 text-primary" />
+              <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center">
+                <Camera className="w-7 h-7 text-white" />
+              </div>
             </Button>
+            
+            {/* Cancel */}
             <Button 
               onClick={stopCamera}
               size="lg"
               variant="outline"
-              className="rounded-full"
+              className="rounded-full w-12 h-12 p-0 bg-white/20 backdrop-blur border-white/30 text-white hover:bg-white/30"
             >
               <X className="w-5 h-5" />
             </Button>
+          </div>
+          
+          {/* Camera mode indicator */}
+          <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/40 backdrop-blur text-white text-xs font-medium">
+            {facingMode === 'environment' ? '📷 Back Camera' : '🤳 Front Camera'}
           </div>
         </div>
       ) : (
@@ -157,8 +226,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
               {isAnalyzing && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center rounded-xl">
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                    <div className="relative">
+                      <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                      <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-primary/20" />
+                    </div>
                     <p className="text-sm font-medium text-foreground">{t('analyzing')}</p>
+                    <p className="text-xs text-muted-foreground">Detecting plant diseases...</p>
                   </div>
                 </div>
               )}
@@ -173,20 +246,25 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center animate-pulse-slow">
-                {isDragging ? (
-                  <ImageIcon className="w-10 h-10 text-primary" />
-                ) : (
-                  <Upload className="w-10 h-10 text-primary" />
-                )}
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center animate-pulse-slow">
+                  {isDragging ? (
+                    <ImageIcon className="w-12 h-12 text-primary" />
+                  ) : (
+                    <Upload className="w-12 h-12 text-primary" />
+                  )}
+                </div>
+                <div className="absolute -top-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg">
+                  🌱
+                </div>
               </div>
               <div className="text-center">
                 <h3 className="font-semibold text-lg text-foreground mb-1">{t('uploadTitle')}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{t('uploadDesc')}</p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <label>
-                  <Button variant="hero" size="lg" asChild>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <label className="flex-1 sm:flex-initial">
+                  <Button variant="hero" size="lg" className="w-full" asChild>
                     <span>
                       <Upload className="w-4 h-4 mr-2" />
                       {t('uploadButton')}
@@ -202,8 +280,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  onClick={startCamera}
-                  className="border-primary/30 hover:bg-primary/10"
+                  onClick={() => startCamera()}
+                  className="border-primary/30 hover:bg-primary/10 flex-1 sm:flex-initial"
                 >
                   <Camera className="w-4 h-4 mr-2" />
                   {t('takePhoto')}
