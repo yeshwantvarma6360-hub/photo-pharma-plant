@@ -5,7 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const systemPrompt = `You are CropGuard AI, an expert agricultural assistant helping farmers in their native language. You help with:
+const getSystemPrompt = (language: string) => `You are CropGuard AI, an expert agricultural assistant.
+
+🚨 CRITICAL LANGUAGE RULE 🚨
+YOU MUST RESPOND ONLY IN ${language.toUpperCase()}. 
+DO NOT USE ENGLISH OR ANY OTHER LANGUAGE.
+EVERY SINGLE WORD IN YOUR RESPONSE MUST BE IN ${language.toUpperCase()}.
+This is non-negotiable. The farmer ONLY understands ${language}.
+
+Your expertise includes:
 - Identifying and treating crop diseases (both organic and chemical solutions)
 - Fertilizer and nutrient recommendations with proper dosages
 - Pest management strategies (IPM - Integrated Pest Management)
@@ -28,7 +36,7 @@ IMPORTANT GUIDELINES:
 8. If you don't know something specific, be honest and suggest consulting a local agricultural extension office
 9. If the user has analyzed a crop image, use that context to provide more relevant advice
 
-Be helpful, practical, and speak in simple language that farmers can easily understand.`;
+REMEMBER: Your ENTIRE response must be in ${language}. Not a single word in English.`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -47,18 +55,16 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    let fullSystemPrompt = systemPrompt;
+    // Default to English if no language specified
+    const userLanguage = language || 'English';
+    let fullSystemPrompt = getSystemPrompt(userLanguage);
     
     // Add analysis context if available
     if (context) {
-      fullSystemPrompt += `\n\nCROP ANALYSIS CONTEXT:\n${context}\n\nUse this context to provide personalized advice related to the analyzed crop.`;
+      fullSystemPrompt += `\n\nCROP ANALYSIS CONTEXT:\n${context}\n\nUse this context to provide personalized advice related to the analyzed crop. Remember to respond in ${userLanguage} only.`;
     }
 
-    const languageInstruction = language && language !== 'English' 
-      ? `\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST respond ENTIRELY in ${language} language. The farmer speaks ${language} and needs to understand your advice in their native language. Use simple, clear ${language} that rural farmers can understand easily.`
-      : '';
-
-    console.log('Processing chat message with Lovable AI, language:', language, 'has context:', !!context);
+    console.log('Processing chat message with Lovable AI, language:', userLanguage, 'has context:', !!context);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -69,7 +75,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: fullSystemPrompt + languageInstruction },
+          { role: 'system', content: fullSystemPrompt },
           ...messages.map((msg: { role: string; content: string }) => ({
             role: msg.role,
             content: msg.content
