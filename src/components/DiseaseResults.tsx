@@ -1,17 +1,21 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Shield, Leaf } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Shield, Leaf, Beaker, TreeDeciduous, Volume2, VolumeX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { DiseaseResult } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
+import { useSpeech } from '@/hooks/useSpeech';
 
 interface DiseaseResultsProps {
   result: DiseaseResult | null;
 }
 
 const DiseaseResults: React.FC<DiseaseResultsProps> = ({ result }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { speak, stop, isSpeaking } = useSpeech(language);
 
   if (!result) {
     return (
@@ -25,6 +29,20 @@ const DiseaseResults: React.FC<DiseaseResultsProps> = ({ result }) => {
       </Card>
     );
   }
+
+  const speakResults = () => {
+    const text = `
+      ${result.isHealthy ? t('healthy') : t('diseaseDetected')}: ${result.name}. 
+      ${t('confidence')}: ${result.confidence}%. 
+      ${result.description}. 
+      ${t('precautions')}: ${result.precautions.join('. ')}
+    `;
+    if (isSpeaking) {
+      stop();
+    } else {
+      speak(text);
+    }
+  };
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -56,6 +74,9 @@ const DiseaseResults: React.FC<DiseaseResultsProps> = ({ result }) => {
                 <p className="text-lg font-semibold text-foreground">{result.name}</p>
               </div>
             </div>
+            <Button variant="ghost" size="icon" onClick={speakResults}>
+              {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -98,35 +119,119 @@ const DiseaseResults: React.FC<DiseaseResultsProps> = ({ result }) => {
         </CardContent>
       </Card>
 
-      {/* Fertilizers */}
+      {/* Treatment Tabs */}
       <Card className="glass-card animate-slide-up-delay-2">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Leaf className="w-5 h-5 text-primary" />
+            <Beaker className="w-5 h-5 text-primary" />
             {t('fertilizers')}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {result.fertilizers.map((fertilizer, index) => (
-              <div 
-                key={index} 
-                className="p-4 rounded-xl bg-muted/50 border border-border/50"
-              >
-                <h4 className="font-semibold text-foreground mb-2">{fertilizer.name}</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Dosage: </span>
-                    <span className="text-foreground">{fertilizer.dosage}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Timing: </span>
-                    <span className="text-foreground">{fertilizer.timing}</span>
+          <Tabs defaultValue="all" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="all">{t('fertilizers')}</TabsTrigger>
+              <TabsTrigger value="organic" className="flex items-center gap-1">
+                <TreeDeciduous className="w-3 h-3" />
+                {t('organicTreatment')}
+              </TabsTrigger>
+              <TabsTrigger value="chemical" className="flex items-center gap-1">
+                <Beaker className="w-3 h-3" />
+                {t('chemicalTreatment')}
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="all" className="space-y-4">
+              {result.fertilizers.map((fertilizer, index) => (
+                <div 
+                  key={index} 
+                  className="p-4 rounded-xl bg-muted/50 border border-border/50"
+                >
+                  <h4 className="font-semibold text-foreground mb-2">{fertilizer.name}</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">{t('dosage')}: </span>
+                      <span className="text-foreground">{fertilizer.dosage}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{t('timing')}: </span>
+                      <span className="text-foreground">{fertilizer.timing}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="organic" className="space-y-4">
+              {result.organicTreatments && result.organicTreatments.length > 0 ? (
+                result.organicTreatments.map((treatment, index) => (
+                  <div 
+                    key={index} 
+                    className="p-4 rounded-xl bg-success/10 border border-success/20"
+                  >
+                    <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                      <TreeDeciduous className="w-4 h-4 text-success" />
+                      {treatment.name}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                      <div>
+                        <span className="text-muted-foreground">{t('dosage')}: </span>
+                        <span className="text-foreground">{treatment.dosage}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t('timing')}: </span>
+                        <span className="text-foreground">{treatment.timing}</span>
+                      </div>
+                    </div>
+                    {treatment.safetyNote && (
+                      <p className="text-xs text-success bg-success/10 px-2 py-1 rounded">
+                        💡 {treatment.safetyNote}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Organic treatments will be recommended based on the detected disease.
+                </p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="chemical" className="space-y-4">
+              {result.chemicalTreatments && result.chemicalTreatments.length > 0 ? (
+                result.chemicalTreatments.map((treatment, index) => (
+                  <div 
+                    key={index} 
+                    className="p-4 rounded-xl bg-warning/10 border border-warning/20"
+                  >
+                    <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                      <Beaker className="w-4 h-4 text-warning" />
+                      {treatment.name}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                      <div>
+                        <span className="text-muted-foreground">{t('dosage')}: </span>
+                        <span className="text-foreground">{treatment.dosage}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t('timing')}: </span>
+                        <span className="text-foreground">{treatment.timing}</span>
+                      </div>
+                    </div>
+                    {treatment.safetyNote && (
+                      <p className="text-xs text-warning bg-warning/10 px-2 py-1 rounded">
+                        ⚠️ {t('safetyNote')}: {treatment.safetyNote}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Chemical treatments will be recommended based on the detected disease.
+                </p>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

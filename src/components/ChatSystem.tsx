@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Loader2, X, Volume2, VolumeX, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useSpeech } from '@/hooks/useSpeech';
+import { languageNames } from '@/lib/translations';
 
 interface Message {
   id: string;
@@ -17,20 +19,41 @@ interface Message {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crop-chat`;
 
-const ChatSystem: React.FC = () => {
+interface ChatSystemProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+const ChatSystem: React.FC<ChatSystemProps> = ({ isOpen = true, onClose }) => {
   const { t, language } = useLanguage();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: "I'm CropGuard AI, your agricultural assistant. I can help you identify crop diseases, recommend treatments, and provide farming best practices. How can I assist you today?",
-      timestamp: new Date(),
-    },
-  ]);
+  const { speak, stop, isSpeaking } = useSpeech(language);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Set initial greeting in selected language
+  useEffect(() => {
+    const greetings: Record<string, string> = {
+      en: "Hello! I'm CropGuard AI, your agricultural assistant. I can help you identify crop diseases, recommend treatments (both organic and chemical), and provide farming best practices. How can I assist you today?",
+      hi: "नमस्ते! मैं क्रॉपगार्ड AI हूं, आपका कृषि सहायक। मैं फसल रोगों की पहचान, उपचार (जैविक और रासायनिक दोनों) की सिफारिश, और खेती की सर्वोत्तम प्रथाओं में आपकी मदद कर सकता हूं। आज मैं आपकी कैसे सहायता कर सकता हूं?",
+      te: "హలో! నేను క్రాప్‌గార్డ్ AI, మీ వ్యవసాయ సహాయకుడిని. పంట వ్యాధులను గుర్తించడం, చికిత్సలను (సేంద్రియ మరియు రసాయన రెండూ) సిఫార్సు చేయడం మరియు వ్యవసాయ ఉత్తమ అభ్యాసాలను అందించడంలో నేను మీకు సహాయం చేయగలను. ఈ రోజు నేను మీకు ఎలా సహాయం చేయగలను?",
+      kn: "ಹಲೋ! ನಾನು ಕ್ರಾಪ್‌ಗಾರ್ಡ್ AI, ನಿಮ್ಮ ಕೃಷಿ ಸಹಾಯಕ. ಬೆಳೆ ರೋಗಗಳನ್ನು ಗುರುತಿಸಲು, ಚಿಕಿತ್ಸೆಗಳನ್ನು (ಸಾವಯವ ಮತ್ತು ರಾಸಾಯನಿಕ ಎರಡೂ) ಶಿಫಾರಸು ಮಾಡಲು ಮತ್ತು ಕೃಷಿ ಉತ್ತಮ ಅಭ್ಯಾಸಗಳನ್ನು ಒದಗಿಸಲು ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ. ಇಂದು ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?",
+      ta: "வணக்கம்! நான் கிராப்கார்ட் AI, உங்கள் விவசாய உதவியாளர். பயிர் நோய்களைக் கண்டறிய, சிகிச்சைகளை (இயற்கை மற்றும் ரசாயனம் இரண்டையும்) பரிந்துரைக்க மற்றும் விவசாய சிறந்த நடைமுறைகளை வழங்க நான் உங்களுக்கு உதவ முடியும். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?",
+      bn: "হ্যালো! আমি ক্রপগার্ড AI, আপনার কৃষি সহকারী। আমি ফসলের রোগ চিহ্নিত করতে, চিকিৎসা (জৈব এবং রাসায়নিক উভয়) সুপারিশ করতে এবং কৃষি সেরা অনুশীলন প্রদান করতে সাহায্য করতে পারি। আজ আমি আপনাকে কিভাবে সাহায্য করতে পারি?",
+      es: "¡Hola! Soy CropGuard AI, tu asistente agrícola. Puedo ayudarte a identificar enfermedades de cultivos, recomendar tratamientos (tanto orgánicos como químicos) y proporcionar las mejores prácticas agrícolas. ¿Cómo puedo asistirte hoy?",
+      fr: "Bonjour! Je suis CropGuard AI, votre assistant agricole. Je peux vous aider à identifier les maladies des cultures, recommander des traitements (biologiques et chimiques) et fournir les meilleures pratiques agricoles. Comment puis-je vous aider aujourd'hui?",
+      pt: "Olá! Eu sou o CropGuard AI, seu assistente agrícola. Posso ajudá-lo a identificar doenças de culturas, recomendar tratamentos (orgânicos e químicos) e fornecer as melhores práticas agrícolas. Como posso ajudá-lo hoje?",
+    };
+
+    setMessages([{
+      id: '1',
+      role: 'assistant',
+      content: greetings[language] || greetings.en,
+      timestamp: new Date(),
+    }]);
+  }, [language]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -47,7 +70,7 @@ const ChatSystem: React.FC = () => {
       },
       body: JSON.stringify({ 
         messages: userMessages,
-        language: language 
+        language: languageNames[language] 
       }),
     });
 
@@ -112,6 +135,8 @@ const ChatSystem: React.FC = () => {
     setMessages(prev => prev.map(m => 
       m.id === 'streaming' ? { ...m, id: Date.now().toString() } : m
     ));
+
+    return assistantContent;
   };
 
   const handleSend = async () => {
@@ -154,15 +179,32 @@ const ChatSystem: React.FC = () => {
     }
   };
 
+  const handleSpeak = (text: string) => {
+    if (isSpeaking) {
+      stop();
+    } else {
+      speak(text);
+    }
+  };
+
+  if (!isOpen) return null;
+
   return (
     <Card className="glass-card h-[500px] flex flex-col">
       <CardHeader className="pb-2 border-b border-border/50">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary" />
-          </div>
-          {t('chatTitle')}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            {t('chatTitle')}
+          </CardTitle>
+          {onClose && (
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -193,7 +235,27 @@ const ChatSystem: React.FC = () => {
                     ? "bg-primary text-primary-foreground rounded-tr-sm"
                     : "bg-muted text-foreground rounded-tl-sm"
                 )}>
-                  {message.content}
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  {message.role === 'assistant' && message.id !== 'streaming' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSpeak(message.content)}
+                      className="mt-2 h-7 px-2 text-xs"
+                    >
+                      {isSpeaking ? (
+                        <>
+                          <VolumeX className="w-3 h-3 mr-1" />
+                          {t('stopSpeaking')}
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3 h-3 mr-1" />
+                          {t('speakResponse')}
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

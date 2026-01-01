@@ -11,7 +11,9 @@ When analyzing crop images, you must:
 2. Provide a confidence score (0-100)
 3. Give a detailed description of the condition
 4. List 5 specific precautions the farmer should take
-5. Recommend 3 fertilizers/treatments with dosage and timing
+5. Recommend 3 general fertilizers/treatments with dosage and timing
+6. Provide 2-3 ORGANIC treatments (natural, eco-friendly solutions)
+7. Provide 2-3 CHEMICAL treatments (with proper safety warnings)
 
 Respond ONLY in valid JSON format with this exact structure:
 {
@@ -24,13 +26,43 @@ Respond ONLY in valid JSON format with this exact structure:
     {"name": "Fertilizer Name", "dosage": "amount per application", "timing": "when to apply"},
     {"name": "Fertilizer Name 2", "dosage": "amount", "timing": "timing"},
     {"name": "Fertilizer Name 3", "dosage": "amount", "timing": "timing"}
+  ],
+  "organicTreatments": [
+    {"name": "Organic Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "optional safety tip"},
+    {"name": "Organic Treatment 2", "dosage": "amount", "timing": "timing"}
+  ],
+  "chemicalTreatments": [
+    {"name": "Chemical Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "IMPORTANT safety warning"},
+    {"name": "Chemical Treatment 2", "dosage": "amount", "timing": "timing", "safetyNote": "safety warning"}
   ]
 }
 
 Be specific about the disease symptoms you observe. Common crop diseases include:
 - Late Blight, Early Blight, Powdery Mildew, Bacterial Leaf Spot
 - Rust, Anthracnose, Fusarium Wilt, Downy Mildew
-- Leaf Curl, Mosaic Virus, Root Rot, Nutrient Deficiencies`;
+- Leaf Curl, Mosaic Virus, Root Rot, Nutrient Deficiencies
+
+For organic treatments, include natural remedies like:
+- Neem oil, baking soda solutions, compost tea, garlic spray
+- Beneficial insects, crop rotation, companion planting
+- Organic copper or sulfur-based fungicides
+
+For chemical treatments, always include:
+- Proper dosage and application method
+- Safety precautions (PPE, waiting periods before harvest)
+- Environmental considerations`;
+
+const languageInstructions: Record<string, string> = {
+  en: '',
+  hi: 'Hindi (हिन्दी)',
+  te: 'Telugu (తెలుగు)',
+  kn: 'Kannada (ಕನ್ನಡ)',
+  ta: 'Tamil (தமிழ்)',
+  bn: 'Bengali (বাংলা)',
+  es: 'Spanish (Español)',
+  fr: 'French (Français)',
+  pt: 'Portuguese (Português)',
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -49,11 +81,12 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const languageInstruction = language && language !== 'en' 
-      ? `\n\nIMPORTANT: Respond with all text content (name, description, precautions, fertilizer names/dosage/timing) in ${language} language.`
+    const langName = languageInstructions[language] || '';
+    const languageInstruction = langName 
+      ? `\n\nCRITICAL: You MUST respond with ALL text content (name, description, precautions, all treatment names/dosage/timing/safetyNotes) in ${langName} language. The farmer speaks ${langName} and needs to understand everything clearly in their native language.`
       : '';
 
-    console.log('Analyzing crop image with Lovable AI...');
+    console.log('Analyzing crop image with Lovable AI, language:', language);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -70,7 +103,7 @@ serve(async (req) => {
             content: [
               { 
                 type: 'text', 
-                text: 'Analyze this crop image and identify any diseases or health issues. Provide your response in the exact JSON format specified.' 
+                text: 'Analyze this crop image carefully. Identify any diseases, nutrient deficiencies, or pest damage. Provide comprehensive treatment options including both organic and chemical solutions. Be accurate and helpful to farmers.' 
               },
               { 
                 type: 'image_url', 
@@ -106,7 +139,7 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
-    console.log('AI Response received:', content?.substring(0, 200));
+    console.log('AI Response received:', content?.substring(0, 300));
 
     // Parse the JSON response
     let result;
@@ -137,6 +170,13 @@ serve(async (req) => {
           { name: 'Balanced NPK (15-15-15)', dosage: '100g per plant', timing: 'Every 4 weeks' },
           { name: 'Organic Compost', dosage: '2kg per square meter', timing: 'At planting' },
           { name: 'Micronutrient Mix', dosage: '2g per liter', timing: 'Monthly foliar spray' }
+        ],
+        organicTreatments: [
+          { name: 'Neem Oil Spray', dosage: '2ml per liter water', timing: 'Every 7 days', safetyNote: 'Apply in evening' },
+          { name: 'Compost Tea', dosage: 'Dilute 1:10', timing: 'Weekly' }
+        ],
+        chemicalTreatments: [
+          { name: 'General Fungicide', dosage: 'As per label', timing: 'When symptoms appear', safetyNote: 'Wear protective gear' }
         ]
       };
     }
