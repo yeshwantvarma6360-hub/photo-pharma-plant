@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Leaf, Sparkles } from 'lucide-react';
+import { Leaf, Sparkles, MessageCircle, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import LanguageSelector from '@/components/LanguageSelector';
 import ImageUploader from '@/components/ImageUploader';
 import DiseaseResults from '@/components/DiseaseResults';
 import ChatSystem from '@/components/ChatSystem';
+import WeatherWidget from '@/components/WeatherWidget';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { DiseaseResult } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +18,7 @@ const MainContent: React.FC = () => {
   const { toast } = useToast();
   const [result, setResult] = useState<DiseaseResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
 
   const handleImageUpload = useCallback(async (imageBase64: string) => {
     setIsAnalyzing(true);
@@ -70,7 +73,7 @@ const MainContent: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/80 to-background" />
         
         <div className="relative container mx-auto px-4 py-6">
-          <nav className="flex items-center justify-between mb-12">
+          <nav className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
                 <Leaf className="w-7 h-7 text-primary" />
@@ -80,7 +83,12 @@ const MainContent: React.FC = () => {
             <LanguageSelector />
           </nav>
 
-          <div className="text-center max-w-3xl mx-auto py-12">
+          {/* Weather Widget */}
+          <div className="mb-8">
+            <WeatherWidget />
+          </div>
+
+          <div className="text-center max-w-3xl mx-auto py-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6 animate-slide-up">
               <Sparkles className="w-4 h-4" />
               AI-Powered Disease Detection
@@ -107,10 +115,33 @@ const MainContent: React.FC = () => {
 
           {/* Right Column - Chat */}
           <div className="lg:sticky lg:top-8 h-fit">
-            <ChatSystem />
+            {isChatOpen ? (
+              <ChatSystem isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+            ) : (
+              <Button
+                onClick={() => setIsChatOpen(true)}
+                className="w-full h-16 text-lg"
+                variant="hero"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                {t('openChat')}
+              </Button>
+            )}
           </div>
         </div>
       </main>
+
+      {/* Floating Chat Button (Mobile) */}
+      {!isChatOpen && (
+        <Button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg lg:hidden z-50"
+          variant="hero"
+          size="icon"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </Button>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-border/50 mt-16">
