@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const systemPrompt = `You are an expert agricultural AI assistant specialized in crop disease detection and plant pathology. 
+const systemPrompt = `You are an expert agricultural AI assistant specialized in crop disease detection and plant pathology with extensive knowledge of global agriculture.
 
 CRITICAL FIRST STEP: Before any analysis, you MUST determine if the image contains a plant, crop, leaf, or any agricultural subject.
 
@@ -16,13 +16,15 @@ If the image does NOT contain a plant, crop, leaf, vegetation, or agricultural c
   "notPlantMessage": "This image does not appear to contain a plant or crop. Please upload a clear photo of a plant, leaf, or crop for disease analysis."
 }
 
-If the image DOES contain a plant/crop, analyze it and return:
+If the image DOES contain a plant/crop, analyze it thoroughly and return:
 {
   "isPlant": true,
   "name": "Disease Name or Healthy Plant",
+  "cropType": "Identified crop type (e.g., Rice, Wheat, Tomato, Cotton, etc.)",
   "confidence": 85,
   "isHealthy": false,
-  "description": "Detailed description of the condition observed",
+  "description": "Detailed description of the condition observed including symptoms, affected plant parts, and progression stage",
+  "severity": "mild/moderate/severe",
   "precautions": ["precaution 1", "precaution 2", "precaution 3", "precaution 4", "precaution 5"],
   "fertilizers": [
     {"name": "Fertilizer Name", "dosage": "amount per application", "timing": "when to apply"}
@@ -32,16 +34,49 @@ If the image DOES contain a plant/crop, analyze it and return:
   ],
   "chemicalTreatments": [
     {"name": "Chemical Treatment 1", "dosage": "amount", "timing": "when to apply", "safetyNote": "IMPORTANT safety warning"}
-  ]
+  ],
+  "preventiveMeasures": ["measure 1", "measure 2", "measure 3"]
 }
 
-Be specific about disease symptoms. Common crop diseases include:
-- Late Blight, Early Blight, Powdery Mildew, Bacterial Leaf Spot
-- Rust, Anthracnose, Fusarium Wilt, Downy Mildew
-- Leaf Curl, Mosaic Virus, Root Rot, Nutrient Deficiencies
+SUPPORTED CROPS (identify and analyze any of these):
+- Cereals: Rice, Wheat, Maize/Corn, Sorghum, Millet, Barley, Oats
+- Pulses: Chickpea, Lentil, Pigeon Pea, Black Gram, Green Gram, Kidney Bean
+- Oilseeds: Soybean, Groundnut/Peanut, Sunflower, Mustard, Sesame, Castor
+- Vegetables: Tomato, Potato, Onion, Brinjal/Eggplant, Chili, Cabbage, Cauliflower, Carrot, Radish, Cucumber, Pumpkin, Okra/Lady Finger, Spinach, Beans
+- Fruits: Mango, Banana, Citrus (Orange, Lemon, Lime), Apple, Grape, Papaya, Guava, Pomegranate, Watermelon, Coconut
+- Commercial Crops: Cotton, Sugarcane, Jute, Tea, Coffee, Rubber, Tobacco
+- Spices: Turmeric, Ginger, Cardamom, Black Pepper, Coriander, Cumin
 
-For organic treatments include: Neem oil, baking soda solutions, compost tea, garlic spray, beneficial insects.
-For chemical treatments always include safety precautions (PPE, waiting periods before harvest).`;
+COMMON DISEASES BY CROP TYPE:
+- Rice: Blast, Bacterial Leaf Blight, Brown Spot, Sheath Blight, Tungro
+- Wheat: Rust (Yellow/Brown/Black), Powdery Mildew, Karnal Bunt, Loose Smut
+- Tomato: Early Blight, Late Blight, Septoria Leaf Spot, Bacterial Wilt, Mosaic Virus
+- Potato: Late Blight, Early Blight, Black Scurf, Common Scab
+- Cotton: Bacterial Blight, Anthracnose, Alternaria Leaf Spot, Root Rot
+- Banana: Panama Disease, Black Sigatoka, Bunchy Top Virus
+- Mango: Anthracnose, Powdery Mildew, Bacterial Canker, Mango Malformation
+- Citrus: Citrus Canker, Greening Disease, Gummosis, Leaf Miner
+- Sugarcane: Red Rot, Smut, Grassy Shoot, Ratoon Stunting
+- Groundnut: Tikka Disease, Collar Rot, Stem Rot, Bud Necrosis
+
+GENERAL DISEASES (can affect multiple crops):
+- Fungal: Powdery Mildew, Downy Mildew, Rust, Anthracnose, Fusarium Wilt, Root Rot, Damping Off
+- Bacterial: Bacterial Leaf Spot, Bacterial Wilt, Soft Rot, Crown Gall
+- Viral: Mosaic Virus, Leaf Curl, Yellow Vein, Ring Spot
+- Nutrient Deficiencies: Nitrogen (yellowing), Phosphorus (purple leaves), Potassium (brown edges), Iron (chlorosis)
+
+TREATMENT GUIDELINES:
+For organic treatments include: Neem oil (Azadirachtin), Trichoderma, Pseudomonas, Bacillus subtilis, baking soda solutions, compost tea, garlic spray, cow urine mixture, Bordeaux mixture, beneficial insects, crop rotation.
+
+For chemical treatments always include:
+- Specific product names with active ingredients
+- Exact dosage (ml/L or g/L)
+- Application frequency and intervals
+- Pre-harvest interval (PHI)
+- Safety precautions (PPE requirements, restricted entry interval)
+- Environmental considerations
+
+Be extremely specific about disease symptoms, progression stages, and provide actionable treatment recommendations suitable for farmers with varying levels of expertise.`;
 
 const languageInstructions: Record<string, string> = {
   en: '',
@@ -74,10 +109,10 @@ serve(async (req) => {
 
     const langName = languageInstructions[language] || '';
     const languageInstruction = langName 
-      ? `\n\nCRITICAL: You MUST respond with ALL text content in ${langName} language, including the notPlantMessage if the image is not a plant.`
+      ? `\n\nCRITICAL: You MUST respond with ALL text content in ${langName} language, including the notPlantMessage if the image is not a plant. Use simple, farmer-friendly language that rural farmers can easily understand.`
       : '';
 
-    console.log('Analyzing crop image with Lovable AI, language:', language);
+    console.log('Analyzing crop image with Lovable AI (enhanced model), language:', language);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -86,7 +121,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: systemPrompt + languageInstruction },
           { 
@@ -94,7 +129,7 @@ serve(async (req) => {
             content: [
               { 
                 type: 'text', 
-                text: 'First, verify if this image contains a plant, crop, leaf, or any vegetation. If not, indicate that clearly. If it is a plant, analyze it for diseases and provide comprehensive treatment options.' 
+                text: 'First, verify if this image contains a plant, crop, leaf, or any vegetation. If not, indicate that clearly. If it is a plant, provide a comprehensive analysis including: 1) Identify the crop type, 2) Detect any diseases or health issues, 3) Assess severity, 4) Provide detailed organic and chemical treatment options with exact dosages, 5) Include preventive measures for future protection.' 
               },
               { 
                 type: 'image_url', 
@@ -130,7 +165,7 @@ serve(async (req) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     
-    console.log('AI Response received:', content?.substring(0, 300));
+    console.log('AI Response received:', content?.substring(0, 500));
 
     let result;
     try {
@@ -145,13 +180,16 @@ serve(async (req) => {
       result = {
         isPlant: true,
         name: 'Analysis Complete',
+        cropType: 'Unknown',
         confidence: 75,
         isHealthy: true,
         description: content || 'Unable to fully analyze the image. Please try with a clearer photo.',
-        precautions: ['Monitor regularly', 'Maintain proper watering', 'Ensure good soil health'],
-        fertilizers: [{ name: 'Balanced NPK', dosage: '100g per plant', timing: 'Monthly' }],
-        organicTreatments: [{ name: 'Neem Oil', dosage: '2ml per liter', timing: 'Weekly' }],
-        chemicalTreatments: [{ name: 'General Fungicide', dosage: 'As per label', timing: 'When needed', safetyNote: 'Wear protective gear' }]
+        severity: 'mild',
+        precautions: ['Monitor regularly', 'Maintain proper watering', 'Ensure good soil health', 'Check for pests weekly', 'Maintain proper spacing'],
+        fertilizers: [{ name: 'Balanced NPK (10-10-10)', dosage: '100g per plant', timing: 'Monthly during growing season' }],
+        organicTreatments: [{ name: 'Neem Oil Solution', dosage: '2-3ml per liter of water', timing: 'Weekly spray in early morning', safetyNote: 'Safe for humans and beneficial insects' }],
+        chemicalTreatments: [{ name: 'Mancozeb 75% WP', dosage: '2g per liter of water', timing: 'Bi-weekly when symptoms appear', safetyNote: 'Wear gloves and mask during application. Wait 7 days before harvest.' }],
+        preventiveMeasures: ['Crop rotation', 'Proper drainage', 'Balanced fertilization']
       };
     }
 
