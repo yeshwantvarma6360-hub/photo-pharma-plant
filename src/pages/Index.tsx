@@ -7,6 +7,7 @@ import ImageUploader from '@/components/ImageUploader';
 import DiseaseResults from '@/components/DiseaseResults';
 import ChatSystem from '@/components/ChatSystem';
 import WeatherWidget from '@/components/WeatherWidget';
+import CropMonitoringSchedule from '@/components/CropMonitoringSchedule';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { DiseaseResult } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
@@ -105,8 +106,13 @@ const MainContent: React.FC = () => {
           </nav>
 
           {/* Weather Widget */}
-          <div className="mb-8">
+          <div className="mb-6">
             <WeatherWidget />
+          </div>
+
+          {/* Monitoring Schedule */}
+          <div className="mb-8">
+            <CropMonitoringSchedule />
           </div>
 
           <div className="text-center max-w-3xl mx-auto py-8">
