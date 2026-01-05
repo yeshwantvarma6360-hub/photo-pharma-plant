@@ -231,26 +231,26 @@ Use this context to provide more relevant and personalized advice. When the user
   if (!isOpen) return null;
 
   return (
-    <Card className="glass-card h-[520px] flex flex-col shadow-xl">
-      <CardHeader className="pb-2 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+    <Card className="glass-card h-[600px] flex flex-col shadow-2xl shadow-primary/10 border-2 border-border/60">
+      <CardHeader className="pb-3 border-b border-border/50 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+          <CardTitle className="flex items-center gap-3 text-lg">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/30 animate-pulse-slow">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <span className="font-bold">{t('chatTitle')}</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-base">{t('chatTitle')}</span>
               {analysisContext && (
-                <Badge variant="secondary" className="ml-2 text-xs">
+                <Badge variant="secondary" className="mt-0.5 text-xs w-fit bg-primary/10 text-primary border-primary/20">
                   <Leaf className="w-3 h-3 mr-1" />
-                  Connected
+                  Crop Analyzed
                 </Badge>
               )}
             </div>
           </CardTitle>
           {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive">
-              <X className="w-4 h-4" />
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all">
+              <X className="w-5 h-5" />
             </Button>
           )}
         </div>
