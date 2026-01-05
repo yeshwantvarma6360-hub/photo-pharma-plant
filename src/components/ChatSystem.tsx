@@ -30,7 +30,7 @@ interface ChatSystemProps {
 const ChatSystem: React.FC<ChatSystemProps> = ({ isOpen = true, onClose, analysisResult }) => {
   const { t, language } = useLanguage();
   const { toast } = useToast();
-  const { speak, stop, isSpeaking } = useSpeech(language);
+  const { speak, stop, isSpeaking, isLoading: isSpeechLoading } = useSpeech(language);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -290,9 +290,15 @@ Use this context to provide more relevant and personalized advice. When the user
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSpeak(message.content)}
+                      disabled={isSpeechLoading}
                       className="mt-2 h-7 px-2 text-xs hover:bg-white/20"
                     >
-                      {isSpeaking ? (
+                      {isSpeechLoading ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Loading...
+                        </>
+                      ) : isSpeaking ? (
                         <>
                           <VolumeX className="w-3 h-3 mr-1" />
                           {t('stopSpeaking')}
