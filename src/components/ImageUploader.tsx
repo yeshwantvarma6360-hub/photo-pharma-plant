@@ -81,33 +81,69 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
   const startCamera = async (facing: 'environment' | 'user' = facingMode) => {
     try {
       setCameraError(null);
+      setShowCamera(true);
       
       // Stop existing stream first
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
       
       setIsCameraReady(false);
       
-      // Try with specific facing mode first
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported on this browser');
+      }
+      
       let stream: MediaStream | null = null;
       
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
+      // Try with specific facing mode first (works best on mobile)
+      const constraints: MediaStreamConstraints[] = [
+        // First try: ideal facing mode with preferred dimensions
+        { 
           video: { 
             facingMode: { ideal: facing },
-            width: { ideal: 1920, min: 640 },
-            height: { ideal: 1080, min: 480 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           },
           audio: false
-        });
-      } catch (e) {
-        // Fallback: try without facing mode constraint
-        console.log('Falling back to basic camera constraints');
-        stream = await navigator.mediaDevices.getUserMedia({ 
+        },
+        // Second try: exact facing mode (for iOS)
+        { 
+          video: { 
+            facingMode: { exact: facing }
+          },
+          audio: false
+        },
+        // Third try: just facing mode as string
+        { 
+          video: { 
+            facingMode: facing
+          },
+          audio: false
+        },
+        // Final fallback: any video
+        { 
           video: true,
           audio: false
-        });
+        }
+      ];
+      
+      for (const constraint of constraints) {
+        try {
+          console.log('Trying camera constraints:', JSON.stringify(constraint));
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          console.log('Camera started successfully with constraint');
+          break;
+        } catch (e) {
+          console.log('Constraint failed, trying next:', e);
+          continue;
+        }
+      }
+      
+      if (!stream) {
+        throw new Error('Could not access camera with any constraints');
       }
       
       streamRef.current = stream;
@@ -115,42 +151,59 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
-        // Handle video metadata loaded
-        videoRef.current.onloadedmetadata = () => {
-          if (videoRef.current) {
-            videoRef.current.play()
+        // Wait for video to be ready
+        await new Promise<void>((resolve, reject) => {
+          const video = videoRef.current!;
+          const timeout = setTimeout(() => {
+            reject(new Error('Video loading timeout'));
+          }, 10000);
+          
+          video.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            video.play()
               .then(() => {
+                console.log('Video playing, dimensions:', video.videoWidth, 'x', video.videoHeight);
                 setIsCameraReady(true);
+                resolve();
               })
-              .catch((playError) => {
-                console.error('Video play error:', playError);
-                setCameraError('Could not start video playback');
-              });
-          }
-        };
+              .catch(reject);
+          };
+          
+          video.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Video element error'));
+          };
+        });
       }
       
-      setShowCamera(true);
       setFacingMode(facing);
       
       // Re-check available cameras after getting permission
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      setHasMultipleCameras(videoDevices.length > 1);
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        setHasMultipleCameras(videoDevices.length > 1);
+      } catch (e) {
+        console.log('Could not enumerate devices');
+      }
       
     } catch (error: any) {
       console.error('Camera error:', error);
       
       let errorMessage = 'Please allow camera access in your browser settings.';
       
-      if (error.name === 'NotAllowedError') {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         errorMessage = 'Camera permission denied. Please enable camera access in your browser settings.';
-      } else if (error.name === 'NotFoundError') {
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
         errorMessage = 'No camera found on this device.';
-      } else if (error.name === 'NotReadableError') {
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
         errorMessage = 'Camera is being used by another application.';
       } else if (error.name === 'OverconstrainedError') {
         errorMessage = 'Camera does not support the requested settings.';
+      } else if (error.name === 'SecurityError') {
+        errorMessage = 'Camera access requires HTTPS. Please use a secure connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       setCameraError(errorMessage);
@@ -231,7 +284,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, isAnalyzin
             autoPlay
             playsInline
             muted
-            webkit-playsinline="true"
+            controls={false}
           />
           
           {/* Camera controls overlay */}
